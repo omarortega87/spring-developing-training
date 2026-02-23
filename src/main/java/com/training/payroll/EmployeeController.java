@@ -1,6 +1,7 @@
 package com.training.payroll;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -9,6 +10,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.hateoas.CollectionModel;
+import org.springframework.hateoas.EntityModel;
+import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.*;
 
 /*
  * @RestController indicates that the data returned by each method is written straight int the response
@@ -24,13 +28,22 @@ public class EmployeeController {
     this.repository = repository;
   }
 
-  // Aggregate root
-  // tag::get-aggregate-root[]
+  /*
+   * CollectionModel is another Spring HATEOAS container. It is aimed to
+   * encapsulating collections of resources instead of a single resource entity.
+   * It encapsulates a collection of employee resources
+   */
   @GetMapping("/employees")
-  List<Employee> all() {
-    return repository.findAll();
+  CollectionModel<EntityModel<Employee>> all() {
+
+    List<EntityModel<Employee>> employees = repository.findAll().stream()
+        .map(employee -> EntityModel.of(employee,
+            linkTo(methodOn(EmployeeController.class).one(employee.getId())).withSelfRel(),
+            linkTo(methodOn(EmployeeController.class).all()).withRel("employees")))
+        .collect(Collectors.toList());
+
+    return CollectionModel.of(employees, linkTo(methodOn(EmployeeController.class).all()).withSelfRel());
   }
-  // end::get-aggregate-root[]
 
   @PostMapping("/employees")
   Employee newEmployee(@RequestBody Employee newEmployee) {
@@ -38,10 +51,23 @@ public class EmployeeController {
   }
 
   // Single item
+  // This implementation adds links
+  // This tutorial is based on Spring MVC and uses the static helper methods from
+  // WebMvcLinkBuilder to build these links. If you are using Spring WebFlux in
+  // your project, you must instead use WebFluxLinkBuilder.
   @GetMapping("/employees/{id}")
-  Employee one(@PathVariable Long id) {
-    return repository.findById(id)
+  EntityModel<Employee> one(@PathVariable Long id) {
+    Employee employee = repository.findById(id)
         .orElseThrow(() -> new EmployeeNotFoundException(id));
+
+    // EntityModel<T> is a generic container from Spring HATEOAS that includes not
+    // only the data but a collection of links
+    return EntityModel.of(employee,
+        // ask that Spring HATEOAS build a link to the one method of EmployeeController
+        linkTo(methodOn(EmployeeController.class)
+            .one(id)).withSelfRel(),
+        // this builds a link to the aggregate root, all() and call all employees
+        linkTo(methodOn(EmployeeController.class).all()).withRel("employees"));
   }
 
   @PutMapping("/employees/{id}")
