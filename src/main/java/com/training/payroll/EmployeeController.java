@@ -1,8 +1,15 @@
 package com.training.payroll;
 
+import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.linkTo;
+import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.methodOn;
+
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.springframework.hateoas.CollectionModel;
+import org.springframework.hateoas.EntityModel;
+import org.springframework.hateoas.IanaLinkRelations;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -10,9 +17,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.hateoas.CollectionModel;
-import org.springframework.hateoas.EntityModel;
-import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.*;
 
 /*
  * @RestController indicates that the data returned by each method is written straight int the response
@@ -22,10 +26,12 @@ import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.*;
 public class EmployeeController {
 
   private final EmployeeRepository repository;
+  private final EmployeeModelAssembler assembler;
 
   // An EmployeeRepository is injected by constructor into the controller
-  EmployeeController(EmployeeRepository repository) {
+  EmployeeController(EmployeeRepository repository, EmployeeModelAssembler assembler) {
     this.repository = repository;
+    this.assembler = assembler;
   }
 
   /*
@@ -37,17 +43,20 @@ public class EmployeeController {
   CollectionModel<EntityModel<Employee>> all() {
 
     List<EntityModel<Employee>> employees = repository.findAll().stream()
-        .map(employee -> EntityModel.of(employee,
-            linkTo(methodOn(EmployeeController.class).one(employee.getId())).withSelfRel(),
-            linkTo(methodOn(EmployeeController.class).all()).withRel("employees")))
+        .map(assembler::toModel)
         .collect(Collectors.toList());
 
     return CollectionModel.of(employees, linkTo(methodOn(EmployeeController.class).all()).withSelfRel());
   }
 
   @PostMapping("/employees")
-  Employee newEmployee(@RequestBody Employee newEmployee) {
-    return repository.save(newEmployee);
+  ResponseEntity<?> newEmployee(@RequestBody Employee newEmployee) {
+
+    EntityModel<Employee> entityModel = assembler.toModel(repository.save(newEmployee));
+
+    return ResponseEntity.created(entityModel.getRequiredLink(IanaLinkRelations.SELF).toUri())
+        .body(entityModel);
+
   }
 
   // Single item
@@ -62,17 +71,12 @@ public class EmployeeController {
 
     // EntityModel<T> is a generic container from Spring HATEOAS that includes not
     // only the data but a collection of links
-    return EntityModel.of(employee,
-        // ask that Spring HATEOAS build a link to the one method of EmployeeController
-        linkTo(methodOn(EmployeeController.class)
-            .one(id)).withSelfRel(),
-        // this builds a link to the aggregate root, all() and call all employees
-        linkTo(methodOn(EmployeeController.class).all()).withRel("employees"));
+    return assembler.toModel(employee);
   }
 
   @PutMapping("/employees/{id}")
-  Employee replaceEmployee(@RequestBody Employee newEmployee, @PathVariable Long id) {
-    return repository.findById(id)
+  ResponseEntity<?> replaceEmployee(@RequestBody Employee newEmployee, @PathVariable Long id) {
+    Employee updatedEmployee = repository.findById(id)
         .map(employee -> {
           employee.setName(newEmployee.getName());
           employee.setRole(newEmployee.getRole());
@@ -81,6 +85,16 @@ public class EmployeeController {
         .orElseGet(() -> {
           return repository.save(newEmployee);
         });
+
+    EntityModel<Employee> entityModel = assembler.toModel(updatedEmployee);
+
+    // You can retrieve the Link created by the EmployeeModelAssembler with a SELF
+    // rel.
+    // This method returns a Link, which must be turned into a URI with the toUri
+    // method
+    return ResponseEntity
+        .created(entityModel.getRequiredLink(IanaLinkRelations.SELF).toUri())
+        .body(entityModel);
   }
 
   @DeleteMapping("/employees/{id}")
