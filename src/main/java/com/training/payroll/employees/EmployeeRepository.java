@@ -1,4 +1,4 @@
-package com.training.payroll;
+package com.training.payroll.employees;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 

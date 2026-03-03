@@ -1,4 +1,4 @@
-package com.training.payroll;
+package com.training.payroll.employees;
 
 import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.linkTo;
 import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.methodOn;
@@ -98,8 +98,8 @@ public class EmployeeController {
   }
 
   @DeleteMapping("/employees/{id}")
-  void deleteEmployee(@PathVariable Long id) {
+  ResponseEntity<?> deleteEmployee(@PathVariable Long id) {
     repository.deleteById(id);
+    return ResponseEntity.noContent().build();
   }
-
 }
