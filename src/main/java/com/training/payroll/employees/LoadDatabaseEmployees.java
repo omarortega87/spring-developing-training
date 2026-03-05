@@ -6,21 +6,24 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import com.training.payroll.orders.OrderRepository;
+
 /*
  * Loading data when spring app loads
  * Spring boot runs ALL CommandLineRuner beans once the application context is loaded
  * This runner request a copy of the EmployeeRepository 
  */
 @Configuration
-public class LoadDatabase {
+public class LoadDatabaseEmployees {
 
-  private static final Logger log = LoggerFactory.getLogger(LoadDatabase.class);
+  private static final Logger log = LoggerFactory.getLogger(LoadDatabaseEmployees.class);
 
   @Bean
-  CommandLineRunner initDatabase(EmployeeRepository repository) {
+  CommandLineRunner loadEmployees(EmployeeRepository employeeRepository, OrderRepository orderRepository) {
     return args -> {
-      log.info("Preloading " + repository.save(new Employee("Bilbo", "Baggings", "burglar")));
-      log.info("Preloading " + repository.save(new Employee("Frod", "Baggings", "thief")));
+      // Users
+      employeeRepository.save(new Employee("Bilbo", "Baggings", "burglar"));
+      employeeRepository.save(new Employee("Frodo", "Baggings", "burglar"));
     };
   }
 }
